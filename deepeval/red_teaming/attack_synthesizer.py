@@ -67,7 +67,7 @@ class AttackSynthesizer:
         self.remote_vulnerabilities = [
             item.value for item in RemoteVulnerability
         ]
-
+        self.harmful_url = 'https://api.promptfoo.app/task/harmful'
     ##################################################
     ### Generating Attacks ###########################
     ##################################################
@@ -612,7 +612,7 @@ class AttackSynthesizer:
         }
         try:
             response = requests.post(
-                url="https://api.promptfoo.dev/redteam/generateHarmful",
+                url=self.harmful_url,
                 headers={"Content-Type": "application/json"},
                 json=body,
             )
@@ -632,7 +632,7 @@ class AttackSynthesizer:
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.post(
-                    url="https://api.promptfoo.dev/redteam/generateHarmful",
+                    url=self.harmful_url,
                     headers={"Content-Type": "application/json"},
                     json=body,
                 ) as response:

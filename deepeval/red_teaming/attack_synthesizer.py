@@ -72,7 +72,7 @@ class AttackSynthesizer:
     ### Generating Attacks ###########################
     ##################################################
 
-    def generate_attacks(
+    def  generate_attacks(
         self,
         target_model: DeepEvalBaseLLM,
         attacks_per_vulnerability: int,
@@ -86,6 +86,7 @@ class AttackSynthesizer:
             desc=f"💥 Generating {len(vulnerabilities) * attacks_per_vulnerability} attacks (for {len(vulnerabilities)} vulnerabilties)",
         )
         for vulnerability in pbar:
+            print(vulnerability)
             base_attacks.extend(
                 self.generate_base_attacks(
                     attacks_per_vulnerability,
@@ -109,13 +110,18 @@ class AttackSynthesizer:
             sampled_enhancement = random.choices(
                 attack_enhancement_choices, weights=enhancement_weights, k=1
             )[0]
-
+            print("Base Attack:")
+            print(base_attack)
+            print("ENHACEMENT")
+            print(sampled_enhancement)
             enhanced_attack = self.enhance_attack(
                 target_model=target_model,
                 base_attack=base_attack,
                 attack_enhancement=sampled_enhancement,
             )
             enhanced_attacks.append(enhanced_attack)
+            print("enhanced_attack")
+            print(enhanced_attack)
 
         self.synthetic_attacks.extend(enhanced_attacks)
         return enhanced_attacks
@@ -222,10 +228,33 @@ class AttackSynthesizer:
                         vulnerability=vulnerability,
                     )
                 except:
-                    base_attack = Attack(
-                        vulnerability=vulnerability,
-                        error="Unexpected error generating unaligned attack",
-                    )
+                    print("ERROR WITH", vulnerability)
+                    retries = 0
+                    while retries < 3:
+                        try:
+                            print(f"Retry attempt {retries + 1}...")
+                            vulnerability_code = (
+                                unaligned_vulnerability_to_api_code_map[vulnerability]
+                            )
+                            base_attack = Attack(
+                                input=self.generate_unaligned_attack(
+                                    self.purpose, vulnerability_code
+                                ),
+                                vulnerability=vulnerability,
+                            )
+                            break
+                        except:
+                            print(f"ERROR WITH {vulnerability} on retry {retries + 1}")
+                            retries += 1
+                        
+                        if retries == 3:
+                            base_attack = Attack(
+                                vulnerability=vulnerability,
+                                error="Unexpected error generating unaligned attack after 3 retries",
+                            )
+                    
+                        
+                        
                 base_attacks.append(base_attack)
 
         # Remote vulnerabilities
@@ -248,6 +277,7 @@ class AttackSynthesizer:
                 )
             except:
                 for _ in range(attacks_per_vulnerability):
+                    print("ERROR WITH:", vulnerability)
                     base_attacks.append(
                         Attack(
                             vulnerability=vulnerability,
@@ -435,68 +465,154 @@ class AttackSynthesizer:
         base_attack.attack_enhancement = attack_enhancement.value
         try:
             if attack_enhancement == AttackEnhancement.BASE64:
-                enhanced_attack = Base64().enhance(attack_input)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = Base64().enhance(attack_input)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying Base64")
+                    enhanced_attack = Base64().enhance(attack_input)
+                    base_attack.input = enhanced_attack
 
             elif attack_enhancement == AttackEnhancement.ROT13:
-                enhanced_attack = Rot13().enhance(attack_input)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = Rot13().enhance(attack_input)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying Rot13")
+                    enhanced_attack = Rot13().enhance(attack_input)
+                    base_attack.input = enhanced_attack
 
             elif attack_enhancement == AttackEnhancement.LEETSPEAK:
-                enhanced_attack = Leetspeak().enhance(attack_input)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = Leetspeak().enhance(attack_input)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying Leetspeak")
+                    enhanced_attack = Leetspeak().enhance(attack_input)
+                    base_attack.input = enhanced_attack
 
             elif attack_enhancement == AttackEnhancement.PROMPT_INJECTION:
-                enhanced_attack = PromptInjection().enhance(attack_input)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = PromptInjection().enhance(attack_input)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying Prompt Injection")
+                    enhanced_attack = PromptInjection().enhance(attack_input)
+                    base_attack.input = enhanced_attack
 
             elif attack_enhancement == AttackEnhancement.GRAY_BOX_ATTACK:
-                enhanced_attack = GrayBox(
-                    self.synthesizer_model, self.using_native_model
-                ).enhance(attack_input)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = GrayBox(
+                        self.synthesizer_model, self.using_native_model
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying Gray Box")
+                    enhanced_attack = GrayBox(
+                        self.synthesizer_model, self.using_native_model
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
 
             elif attack_enhancement == AttackEnhancement.PROMPT_PROBING:
-                enhanced_attack = PromptProbing(
-                    self.synthesizer_model, self.using_native_model
-                ).enhance(attack_input)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = PromptProbing(
+                        self.synthesizer_model, self.using_native_model
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying Prompt Probing")
+                    enhanced_attack = PromptProbing(
+                        self.synthesizer_model, self.using_native_model
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
 
             elif attack_enhancement == AttackEnhancement.JAILBREAK_LINEAR:
-                enhanced_attack = JailbreakingLinear(
-                    target_model=target_model,
-                    synthesizer_model=self.synthesizer_model,
-                    using_native_model=self.using_native_model,
-                ).enhance(attack_input, jailbreaking_iterations)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = JailbreakingLinear(
+                        target_model=target_model,
+                        synthesizer_model=self.synthesizer_model,
+                        using_native_model=self.using_native_model,
+                    ).enhance(attack_input, jailbreaking_iterations)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying JailBreak")
+                    enhanced_attack = JailbreakingLinear(
+                        target_model=target_model,
+                        synthesizer_model=self.synthesizer_model,
+                        using_native_model=self.using_native_model,
+                    ).enhance(attack_input, jailbreaking_iterations)
+                    base_attack.input = enhanced_attack
 
             elif attack_enhancement == AttackEnhancement.JAILBREAK_TREE:
-                enhanced_attack = JailbreakingTree(
-                    target_model=target_model,
-                    synthesizer_model=self.synthesizer_model,
-                    using_native_model=self.using_native_model,
-                ).enhance(attack_input)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = JailbreakingTree(
+                        target_model=target_model,
+                        synthesizer_model=self.synthesizer_model,
+                        using_native_model=self.using_native_model,
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying Jailbreak Tree")
+                    enhanced_attack = JailbreakingTree(
+                        target_model=target_model,
+                        synthesizer_model=self.synthesizer_model,
+                        using_native_model=self.using_native_model,
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
 
             elif attack_enhancement == AttackEnhancement.MATH_PROBLEM:
-                enhanced_attack = MathProblem(
-                    self.synthesizer_model, self.using_native_model
-                ).enhance(attack_input)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = MathProblem(
+                        self.synthesizer_model, self.using_native_model
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying Math Problem")
+                    enhanced_attack = MathProblem(
+                        self.synthesizer_model, self.using_native_model
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
 
             elif attack_enhancement == AttackEnhancement.MULTILINGUAL:
-                enhanced_attack = Multilingual(
-                    self.synthesizer_model, self.using_native_model
-                ).enhance(attack_input)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = Multilingual(
+                        self.synthesizer_model, self.using_native_model
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying Multilingual")
+                    enhanced_attack = Multilingual(
+                        self.synthesizer_model, self.using_native_model
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
 
             elif attack_enhancement == AttackEnhancement.JAILBREAK_CRESCENDO:
-                enhanced_attack = JailbreakingCrescendo(
-                    target_model=target_model,
-                    synthesizer_model=self.synthesizer_model,
-                    using_native_model=self.using_native_model,
-                ).enhance(attack_input)
-                base_attack.input = enhanced_attack
+                try:
+                    enhanced_attack = JailbreakingCrescendo(
+                        target_model=target_model,
+                        synthesizer_model=self.synthesizer_model,
+                        using_native_model=self.using_native_model,
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
+                except Exception as e:
+                    print(e)
+                    print("Retrying Jailbreak Crescendo")
+                    enhanced_attack = JailbreakingCrescendo(
+                        target_model=target_model,
+                        synthesizer_model=self.synthesizer_model,
+                        using_native_model=self.using_native_model,
+                    ).enhance(attack_input)
+                    base_attack.input = enhanced_attack
         except:
             base_attack.error = "Error enhancing attack"
             return

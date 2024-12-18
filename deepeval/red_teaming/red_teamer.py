@@ -115,17 +115,23 @@ class RedTeamer:
 
                 # Create a mapping of vulnerabilities to attacks
                 vulnerability_to_attacks_map: Dict[
-                    Vulnerability, List[Attack]
+                    Vulnerability, List[Attack] 
                 ] = {}
+                
+                attacks = [item for item in attacks if item != None]
                 for attack in attacks:
-                    if attack.vulnerability not in vulnerability_to_attacks_map:
-                        vulnerability_to_attacks_map[attack.vulnerability] = [
-                            attack
-                        ]
-                    else:
-                        vulnerability_to_attacks_map[
-                            attack.vulnerability
-                        ].append(attack)
+                    try:
+                        if attack.vulnerability:
+                            if attack.vulnerability not in vulnerability_to_attacks_map:
+                                vulnerability_to_attacks_map[attack.vulnerability] = [
+                                    attack
+                                ]
+                            else:
+                                vulnerability_to_attacks_map[
+                                    attack.vulnerability
+                                ].append(attack)
+                    except Exception as e:
+                        print(e)
 
                 # Evaluate each attack by vulnerability
                 red_teaming_results = []
@@ -135,9 +141,14 @@ class RedTeamer:
                     vulnerability_to_attacks_map.items(),
                     desc=f"📝 Evaluating {len(vulnerabilities)} vulnerability(s)",
                 )
+                print("Vuln Map")
+                print(vulnerability_to_attacks_map)
+                
                 for vulnerability, attacks in pbar:
                     scores = []
                     for attack in attacks:
+                        print("attack")
+                        print(attack)
                         metric: BaseMetric = metrics_map.get(vulnerability)()
                         risk = llm_risk_categories_map.get(vulnerability)
                         result = {
@@ -156,17 +167,20 @@ class RedTeamer:
                         if attack.error:
                             result["Error"] = attack.error
                             red_teaming_results_breakdown.append(result)
+                            print(result)
                             continue
-
-                        try:
-                            target_output = target_model.generate(attack.input)
-                            result["Target Output"] = target_output
-                        except Exception:
-                            result["Error"] = (
-                                "Error generating output from target LLM"
-                            )
-                            red_teaming_results_breakdown.append(result)
-                            continue
+                        retries = 0
+                        while retries < 3:
+                            try:
+                                target_output = target_model.generate(attack.input)
+                                result["Target Output"] = target_output
+                                break
+                            except Exception as e:
+                                print("Failed to generate output from target LLM")
+                                retries += 1
+                                if retries == 3:
+                                    result["Error"] = "Error generating output from target LLM"
+                                    print(e)
 
                         test_case = LLMTestCase(
                             input=attack.input,
@@ -182,10 +196,10 @@ class RedTeamer:
                             result["Error"] = (
                                 f"Error evaluating target LLM output for the '{vulnerability.value}' vulnerability"
                             )
-                            red_teaming_results_breakdown.append(result)
-                            continue
-
+                            
+                        
                         red_teaming_results_breakdown.append(result)
+
 
                     # Calculate average score for each vulnerability
                     avg_vulnerability_score = (
